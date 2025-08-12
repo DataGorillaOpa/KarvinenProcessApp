@@ -75,27 +75,24 @@ namespace KarvinenApp
             OriginalButtonPanel.Visibility = Visibility.Collapsed;
             ActiveButtonPanel.Visibility = Visibility.Visible;
 
-            StartSqlProcesses(); // Renamed to reflect multiple processes
+            StartSqlProcessesKunta(); // Renamed to reflect multiple processes
         }
 
-        private void StartSqlProcesses()
+        private void StartSqlProcessesKunta()
         {
             try
             {
-                // Use actual paths without @ and extra quotes
-                string[] processPaths = new string[]
-                {
-                    @"C:\Users\Olli\source\repos\KarvinenRuotsiPöytäkirjaHaku\KarvinenRuotsiPöytäkirjaHaku\bin\Debug\net8.0\KarvinenRuotsiPöytäkirjaHaku.exe",
-                    @"C:\Path\To\Process2.exe",
-                    @"C:\Path\To\Process3.exe",
-                    @"C:\Path\To\Process4.exe",
-                    @"C:\Path\To\Process5.exe"
-                };
+                Dictionary<string, string> processPaths = GetDefaultPaths();
+                CleanupProcesses();
 
-                CleanupProcesses(); // Stop any existing processes
+                int totalProcesses = processPaths.Count;
+                int completedProcesses = 0;
 
-                foreach (string processPath in processPaths)
+                foreach (var kvp in processPaths)
                 {
+                    string processName = kvp.Key;
+                    string processPath = kvp.Value;
+
                     if (File.Exists(processPath))
                     {
                         var process = new Process
@@ -105,17 +102,34 @@ namespace KarvinenApp
                                 FileName = processPath,
                                 UseShellExecute = true,
                                 CreateNoWindow = false
-                            }
+                            },
+                            EnableRaisingEvents = true
+                        };
+
+                        process.Exited += (sender, args) =>
+                        {
+                            Dispatcher.Invoke(() =>
+                            {
+                                completedProcesses++;
+                                UpdateProgress(completedProcesses, totalProcesses);
+
+                                if (completedProcesses == totalProcesses)
+                                {
+                                    AllProcessesCompleted();
+                                }
+                            });
                         };
 
                         if (process.Start())
                         {
                             _runningProcesses.Add(process);
+                            ActiveScriptButton.Content = $"Running {processName}...";
                         }
                     }
                     else
                     {
                         MessageBox.Show($"File not found: {processPath}");
+                        completedProcesses++; // Count missing files as "completed"
                     }
                 }
             }
@@ -125,6 +139,20 @@ namespace KarvinenApp
                               MessageBoxButton.OK, MessageBoxImage.Error);
                 ResetUI();
             }
+        }
+
+        private void UpdateProgress(int completed, int total)
+        {
+            ActiveScriptButton.Content = $"Progress: {completed}/{total} completed";
+            // Optional: Update a progress bar if you have one
+            // progressBar.Value = (double)completed/total * 100;
+        }
+
+        private void AllProcessesCompleted()
+        {
+            //MessageBox.Show("All processes have finished!", "Completion",
+                          //MessageBoxButton.OK, MessageBoxImage.Information);
+            ResetUI();
         }
 
         private void CleanupProcesses()
@@ -167,6 +195,17 @@ namespace KarvinenApp
         private void Button_Click(object sender, RoutedEventArgs e)
         {
             MessageBox.Show($"{((Button)sender).Content} clicked");
+        }
+        private Dictionary<string, string> GetDefaultPaths()
+        {
+            return new Dictionary<string, string>
+    {
+        {"Database Search", @"C:\Users\OlliSalminen\Documents\PöytäkirjaHakuAutomation\PoytakirjaTool\FilterPoytakirjas\bin\Debug\FilterPoytakirjas.exe"},
+        {"Log Analyzer", @"C:\Users\OlliSalminen\Documents\PöytäkirjaHakuAutomation\PoytakirjaTool - Copy\FilterPoytakirjas\bin\Debug\FilterPoytakirjas.exe"},
+        {"File Processor", @"C:\Users\OlliSalminen\Documents\PöytäkirjaHakuAutomation\PoytakirjaTool - Copy - Copy\FilterPoytakirjas\bin\Debug\FilterPoytakirjas.exe"},
+        {"System Report", @"C:\Users\OlliSalminen\Documents\PöytäkirjaHakuAutomation\PoytakirjaTool - Copy (2)\FilterPoytakirjas\bin\Debug\FilterPoytakirjas.exe"},
+        {"Data Sync", @"C:\Users\OlliSalminen\Documents\PöytäkirjaHakuAutomation\PoytakirjaTool - Copy (3)\FilterPoytakirjas\bin\Debug\FilterPoytakirjas.exe"}
+    };
         }
     }
 }
